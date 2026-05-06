@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Greeter DApp</title>
+</head>
+<body>
+
+<h2>Greeter DApp</h2>
+
+<button onclick="connectWallet()">Connect Wallet</button>
+
+<h3>Current Greeting:</h3>
+<p id="greeting"></p>
+
+<input type="text" id="newGreeting" placeholder="Enter new greeting">
+<button onclick="updateGreeting()">Update Greeting</button>
+
+<script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+
+<script>
+let web3;
+let contract;
+
+//  Replace this with your deployed contract address
+const contractAddress = "0xYOUR_CONTRACT_ADDRESS";
+
+// ABI (only needed functions)
+const abi = [
+  {
+    "inputs": [],
+    "name": "greet",
+    "outputs": [{"type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"type": "string", "name": "_greeting"}],
+    "name": "setGreeting",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+];
+
+// Connect MetaMask
+async function connectWallet() {
+  if (window.ethereum) {
+    web3 = new Web3(window.ethereum);
+
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+    contract = new web3.eth.Contract(abi, contractAddress);
+
+    getGreeting(); // load initial value
+  } else {
+    alert("Install MetaMask");
+  }
+}
+
+//  READ function → calls greet()
+async function getGreeting() {
+  const result = await contract.methods.greet().call();
+  document.getElementById("greeting").innerText = result;
+}
+
+//  WRITE function → calls setGreeting()
+async function updateGreeting() {
+  const accounts = await web3.eth.getAccounts();
+  const value = document.getElementById("newGreeting").value;
+
+  await contract.methods.setGreeting(value).send({
+    from: accounts[0]
+  });
+
+  getGreeting(); // refresh after update
+}
+</script>
+
+</body>
+</html>
