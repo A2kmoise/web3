@@ -1,79 +1,144 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Greeter DApp</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Greeter DApp | Web3 Experience</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<h2>Greeter DApp</h2>
+<div class="container">
+    <div class="glass-card">
+        <h1>Greeter DApp</h1>
+        <p class="subtitle">Interact with the blockchain in style</p>
 
-<button onclick="connectWallet()">Connect Wallet</button>
+        <div id="statusBadge" class="status-badge status-disconnected">
+            Not Connected
+        </div>
 
-<h3>Current Greeting:</h3>
-<p id="greeting"></p>
+        <div id="connectSection">
+            <button id="connectBtn" onclick="connectWallet()">
+                Connect Wallet
+            </button>
+        </div>
 
-<input type="text" id="newGreeting" placeholder="Enter new greeting">
-<button onclick="updateGreeting()">Update Greeting</button>
+        <div id="appSection" style="display: none;">
+            <div class="greeting-display">
+                <p class="greeting-label">Current Greeting</p>
+                <p id="greeting">Loading...</p>
+            </div>
+
+            <div class="input-group">
+                <input type="text" id="newGreeting" placeholder="Enter new greeting...">
+                <button id="updateBtn" onclick="updateGreeting()">
+                    <span class="loading-spinner" id="spinner"></span>
+                    <span id="btnText">Update Greeting</span>
+                </button>
+            </div>
+
+            <p class="connected-account" id="accountDisplay"></p>
+        </div>
+    </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
 
 <script>
-let web3;
-let contract;
+    let web3;
+    let contract;
+    
+    // IMPORTANT: Update this with your deployed contract address after running 'npx truffle migrate'
+    const contractAddress = "0x9a48Fb4913925dEC8Cd405B8d2099430e230c3e0";
 
-//  Replace this with your deployed contract address
-const contractAddress = "0xYOUR_CONTRACT_ADDRESS";
+    const abi = [
+        {"inputs": [], "name": "greet", "outputs": [{"type": "string"}], "stateMutability": "view", "type": "function"},
+        {"inputs": [{"type": "string", "name": "_greeting"}], "name": "setGreeting", "outputs": [], "stateMutability": "nonpayable", "type": "function"}
+    ];
 
-// ABI (only needed functions)
-const abi = [
-  {
-    "inputs": [],
-    "name": "greet",
-    "outputs": [{"type": "string"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"type": "string", "name": "_greeting"}],
-    "name": "setGreeting",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
-];
+    async function connectWallet() {
+        if (window.ethereum) {
+            try {
+                const connectBtn = document.getElementById("connectBtn");
+                connectBtn.disabled = true;
+                connectBtn.innerText = "Connecting...";
 
-// Connect MetaMask
-async function connectWallet() {
-  if (window.ethereum) {
-    web3 = new Web3(window.ethereum);
+                web3 = new Web3(window.ethereum);
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                
+                contract = new web3.eth.Contract(abi, contractAddress);
+                
+                updateUIConnected(accounts[0]);
+                getGreeting();
 
-    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                // Listen for account changes
+                window.ethereum.on('accountsChanged', (accounts) => {
+                    if (accounts.length > 0) {
+                        updateUIConnected(accounts[0]);
+                    } else {
+                        location.reload();
+                    }
+                });
 
-    contract = new web3.eth.Contract(abi, contractAddress);
+            } catch (error) {
+                console.error(error);
+                alert("Connection failed!");
+                location.reload();
+            }
+        } else {
+            alert("Please install MetaMask!");
+        }
+    }
 
-    getGreeting(); // load initial value
-  } else {
-    alert("Install MetaMask");
-  }
-}
+    function updateUIConnected(account) {
+        document.getElementById("connectSection").style.display = "none";
+        document.getElementById("appSection").style.display = "block";
+        
+        const badge = document.getElementById("statusBadge");
+        badge.innerText = "Connected";
+        badge.className = "status-badge status-connected";
+        
+        document.getElementById("accountDisplay").innerText = `Account: ${account}`;
+    }
 
-//  READ function → calls greet()
-async function getGreeting() {
-  const result = await contract.methods.greet().call();
-  document.getElementById("greeting").innerText = result;
-}
+    async function getGreeting() {
+        try {
+            const result = await contract.methods.greet().call();
+            document.getElementById("greeting").innerText = result || "No greeting set";
+        } catch (error) {
+            console.error(error);
+            document.getElementById("greeting").innerText = "Error fetching data";
+        }
+    }
 
-//  WRITE function → calls setGreeting()
-async function updateGreeting() {
-  const accounts = await web3.eth.getAccounts();
-  const value = document.getElementById("newGreeting").value;
+    async function updateGreeting() {
+        const input = document.getElementById("newGreeting");
+        const value = input.value;
+        if (!value) return;
 
-  await contract.methods.setGreeting(value).send({
-    from: accounts[0]
-  });
+        const btn = document.getElementById("updateBtn");
+        const spinner = document.getElementById("spinner");
+        const btnText = document.getElementById("btnText");
 
-  getGreeting(); // refresh after update
-}
+        try {
+            btn.disabled = true;
+            spinner.style.display = "block";
+            btnText.innerText = "Confirming...";
+
+            const accounts = await web3.eth.getAccounts();
+            await contract.methods.setGreeting(value).send({ from: accounts[0] });
+
+            input.value = "";
+            await getGreeting();
+        } catch (error) {
+            console.error(error);
+            alert("Transaction failed!");
+        } finally {
+            btn.disabled = false;
+            spinner.style.display = "none";
+            btnText.innerText = "Update Greeting";
+        }
+    }
 </script>
 
 </body>
